@@ -1,16 +1,21 @@
 /* ============================================================
    IG SITES — GESTÃO DE CONVERSAS
-   app.js COMPLETO — VERSÃO CORRIGIDA
+   app.js COMPLETO
 
-   - Menu lateral funciona com o HTML atual (data-view)
-   - Troca de telas sem recarregar a página
-   - Importação com ou sem linhas em branco
+   PRINCIPAIS RECURSOS:
+   - Conversas mais recentes primeiro
+   - Importação de listas
    - Aceita empresa + telefone + etapa na mesma linha
    - Aceita empresa / telefone / etapa em linhas separadas
    - Evita duplicados por telefone
    - Mantém dados no localStorage
-   - Botão "Importar contatos" sempre visível
-   - Modal de importação com rolagem interna
+   - Menu lateral
+   - Dashboard
+   - Funil
+   - Análise
+   - Anotações
+   - Modal de conversa
+   - Registro manual
    - NÃO conecta ao WhatsApp
    - NÃO envia mensagens
    ============================================================ */
@@ -166,6 +171,10 @@ let importadosTemporarios = [];
 
 const $ = id => document.getElementById(id);
 
+/* ============================================================
+   UTILITÁRIOS
+   ============================================================ */
+
 function escaparHTML(valor) {
   return String(valor ?? "").replace(/[&<>"']/g, caractere => ({
     "&": "&amp;",
@@ -194,6 +203,30 @@ function normalizarTexto(valor) {
     .trim();
 }
 
+/* ============================================================
+   ORDENAÇÃO POR DATA
+   MAIS RECENTE PRIMEIRO
+   ============================================================ */
+
+function ordenarPorDataRecente(lista) {
+  return [...lista].sort((a, b) => {
+
+    const dataA = String(
+      a.updated || "0000-00-00"
+    );
+
+    const dataB = String(
+      b.updated || "0000-00-00"
+    );
+
+    return dataB.localeCompare(dataA);
+  });
+}
+
+/* ============================================================
+   TELEFONE
+   ============================================================ */
+
 function normalizarTelefone(valor) {
   let numero = String(valor ?? "").replace(/\D/g, "");
 
@@ -220,6 +253,10 @@ function formatarTelefone(valor) {
 
   return String(valor ?? "").trim();
 }
+
+/* ============================================================
+   ETAPAS
+   ============================================================ */
 
 function etapaValida(etapa) {
   return ETAPAS.includes(etapa);
@@ -301,7 +338,7 @@ function detectarEtapa(texto) {
 }
 
 /* ============================================================
-   TELEFONE
+   DETECTAR TELEFONE
    ============================================================ */
 
 function detectarTelefone(texto) {
@@ -310,13 +347,15 @@ function detectarTelefone(texto) {
   const regexFormatado =
     /(?:\+?55[\s.-]*)?\(?\d{2}\)?[\s.-]*9?\d{4}[\s.-]*\d{4}/;
 
-  const encontrado = textoOriginal.match(regexFormatado);
+  const encontrado =
+    textoOriginal.match(regexFormatado);
 
   if (encontrado) {
     return encontrado[0];
   }
 
-  const apenasNumeros = textoOriginal.match(/(?:55)?\d{10,13}/);
+  const apenasNumeros =
+    textoOriginal.match(/(?:55)?\d{10,13}/);
 
   if (apenasNumeros) {
     return apenasNumeros[0];
@@ -335,7 +374,10 @@ function linhaTemTelefone(linha) {
 
 function carregarConversas() {
   try {
-    const salvo = localStorage.getItem(STORAGE_KEY);
+    const salvo =
+      localStorage.getItem(
+        STORAGE_KEY
+      );
 
     if (!salvo) {
       localStorage.setItem(
@@ -343,72 +385,119 @@ function carregarConversas() {
         JSON.stringify(dadosIniciais)
       );
 
-      return normalizarConversas(dadosIniciais);
+      return normalizarConversas(
+        dadosIniciais
+      );
     }
 
-    const dados = JSON.parse(salvo);
+    const dados =
+      JSON.parse(salvo);
 
     return Array.isArray(dados)
       ? normalizarConversas(dados)
       : [];
 
   } catch (erro) {
-    console.error("Erro ao carregar conversas:", erro);
+    console.error(
+      "Erro ao carregar conversas:",
+      erro
+    );
+
     return [];
   }
 }
 
+function limparEmpresa(valor) {
+  return String(valor ?? "")
+    .replace(/^[-•*|]+\s*/, "")
+    .replace(/\s*[|]+\s*$/, "")
+    .replace(
+      /^(empresa|nome|negocio|negócio)\s*:\s*/i,
+      ""
+    )
+    .trim();
+}
+
 function normalizarConversas(lista) {
-  return lista.map((c, indice) => ({
-    id: c.id ?? gerarId() + indice,
+  return lista.map(
+    (c, indice) => ({
+      id:
+        c.id ??
+        gerarId() +
+          indice,
 
-    company:
-      c.company ??
-      c.empresa ??
-      "Empresa sem nome",
+      company:
+        limparEmpresa(
+          c.company ??
+          c.empresa ??
+          "Empresa sem nome"
+        ),
 
-    phone:
-      formatarTelefone(
-        c.phone ??
-        c.telefone ??
-        ""
-      ),
+      phone:
+        formatarTelefone(
+          c.phone ??
+          c.telefone ??
+          ""
+        ),
 
-    stage:
-      etapaValida(c.stage ?? c.etapa)
-        ? (c.stage ?? c.etapa)
-        : "Prospectado",
+      stage:
+        etapaValida(
+          c.stage ??
+          c.etapa
+        )
+          ? (
+              c.stage ??
+              c.etapa
+            )
+          : "Prospectado",
 
-    firstReply:
-      Number(
-        c.firstReply ??
-        c.tempoPrimeiraResposta ??
-        0
-      ),
+      firstReply:
+        Number(
+          c.firstReply ??
+          c.tempoPrimeiraResposta ??
+          0
+        ),
 
-    updated:
-      c.updated ??
-      c.ultimaAtividade ??
-      hoje(),
+      updated:
+        c.updated ??
+        c.ultimaAtividade ??
+        hoje(),
 
-    note:
-      c.note ??
-      c.observacao ??
-      "",
+      note:
+        c.note ??
+        c.observacao ??
+        "",
 
-    history:
-      Array.isArray(c.history)
-        ? c.history
+      history:
+        Array.isArray(
+          c.history
+        )
+          ? c.history
 
-        : Array.isArray(c.historico)
-          ? c.historico.map(h => ({
-              from: h.from ?? "client",
-              text: h.text ?? h.texto ?? "",
-              time: h.time ?? h.data ?? ""
-            }))
+          : Array.isArray(
+              c.historico
+            )
+            ? c.historico.map(
+                h => ({
+                  from:
+                    h.from ??
+                    "client",
 
-          : []
-  }));
+                  text:
+                    h.text ??
+                    h.texto ??
+                    "",
+
+                  time:
+                    h.time ??
+                    h.data ??
+                    ""
+                })
+              )
+
+            : []
+    })
+  );
 }
 
 function salvarConversas(lista) {
@@ -420,9 +509,12 @@ function salvarConversas(lista) {
 
 function carregarAnotacoes() {
   try {
-    const dados = JSON.parse(
-      localStorage.getItem(NOTES_KEY) || "[]"
-    );
+    const dados =
+      JSON.parse(
+        localStorage.getItem(
+          NOTES_KEY
+        ) || "[]"
+      );
 
     return Array.isArray(dados)
       ? dados
@@ -446,12 +538,21 @@ function getConversas() {
 
 function contarEtapa(etapa) {
   return getConversas()
-    .filter(c => c.stage === etapa)
+    .filter(
+      c =>
+        c.stage === etapa
+    )
     .length;
 }
 
-function telefoneJaExiste(telefone, conversas) {
-  const numero = normalizarTelefone(telefone);
+function telefoneJaExiste(
+  telefone,
+  conversas
+) {
+  const numero =
+    normalizarTelefone(
+      telefone
+    );
 
   if (!numero) {
     return false;
@@ -459,31 +560,24 @@ function telefoneJaExiste(telefone, conversas) {
 
   return conversas.some(
     c =>
-      normalizarTelefone(c.phone) === numero
+      normalizarTelefone(
+        c.phone
+      ) === numero
   );
 }
 
 /* ============================================================
-   IMPORTAÇÃO DE LISTA
+   IMPORTAÇÃO
    ============================================================ */
-
-function limparEmpresa(valor) {
-  return String(valor ?? "")
-    .replace(/^[-•*]+\s*/, "")
-    .replace(
-      /^(empresa|nome|negocio|negócio)\s*:\s*/i,
-      ""
-    )
-    .trim();
-}
 
 function textoDepoisDoTelefone(
   linha,
   telefone
 ) {
-  const pos = String(linha).indexOf(
-    telefone
-  );
+  const pos =
+    String(linha).indexOf(
+      telefone
+    );
 
   if (pos < 0) {
     return "";
@@ -491,7 +585,8 @@ function textoDepoisDoTelefone(
 
   return String(linha)
     .slice(
-      pos + telefone.length
+      pos +
+        telefone.length
     )
     .trim();
 }
@@ -500,30 +595,41 @@ function textoAntesDoTelefone(
   linha,
   telefone
 ) {
-  const pos = String(linha).indexOf(
-    telefone
-  );
+  const pos =
+    String(linha).indexOf(
+      telefone
+    );
 
   if (pos < 0) {
     return "";
   }
 
   return String(linha)
-    .slice(0, pos)
+    .slice(
+      0,
+      pos
+    )
     .trim();
 }
 
 function analisarLista(texto) {
-  const linhas = String(texto ?? "")
-    .replace(/\r/g, "")
-    .split("\n")
-    .map(linha => linha.trim())
-    .filter(Boolean);
+  const linhas =
+    String(texto ?? "")
+      .replace(/\r/g, "")
+      .split("\n")
+      .map(
+        linha =>
+          linha.trim()
+      )
+      .filter(Boolean);
 
   const contatos = [];
 
-  let empresaPendente = "";
-  let contatoAtual = null;
+  let empresaPendente =
+    "";
+
+  let contatoAtual =
+    null;
 
   function finalizar() {
     if (
@@ -538,9 +644,6 @@ function analisarLista(texto) {
         .join(" | ")
         .trim();
 
-    const etapa =
-      detectarEtapa(informacao);
-
     contatos.push({
       empresa:
         limparEmpresa(
@@ -553,7 +656,10 @@ function analisarLista(texto) {
           contatoAtual.telefone
         ),
 
-      etapa,
+      etapa:
+        detectarEtapa(
+          informacao
+        ),
 
       observacao:
         informacao,
@@ -562,18 +668,23 @@ function analisarLista(texto) {
         "importacao"
     });
 
-    contatoAtual = null;
+    contatoAtual =
+      null;
   }
 
-  for (const linha of linhas) {
-    const telefoneOriginal =
-      detectarTelefone(linha);
+  for (
+    const linha of linhas
+  ) {
 
-    /* --------------------------------------------
-       LINHA POSSUI TELEFONE
-       -------------------------------------------- */
+    const telefoneOriginal =
+      detectarTelefone(
+        linha
+      );
+
+    /* LINHA COM TELEFONE */
 
     if (telefoneOriginal) {
+
       finalizar();
 
       const antes =
@@ -589,7 +700,9 @@ function analisarLista(texto) {
         );
 
       const empresa =
-        limparEmpresa(antes) ||
+        limparEmpresa(
+          antes
+        ) ||
         empresaPendente ||
         "Empresa sem nome";
 
@@ -605,19 +718,23 @@ function analisarLista(texto) {
             : []
       };
 
-      empresaPendente = "";
+      empresaPendente =
+        "";
 
       continue;
     }
 
-    /* --------------------------------------------
-       LINHA SEM TELEFONE
-       -------------------------------------------- */
+    /* LINHA SEM TELEFONE */
 
     if (!contatoAtual) {
-      if (!empresaPendente) {
+
+      if (
+        !empresaPendente
+      ) {
         empresaPendente =
-          limparEmpresa(linha);
+          limparEmpresa(
+            linha
+          );
       }
 
       continue;
@@ -630,13 +747,15 @@ function analisarLista(texto) {
 
   finalizar();
 
-  /* --------------------------------------------
-     REMOVE DUPLICADOS DA PRÓPRIA LISTA
-     -------------------------------------------- */
+  /* REMOVE DUPLICADOS */
 
-  const mapa = new Map();
+  const mapa =
+    new Map();
 
-  for (const contato of contatos) {
+  for (
+    const contato of contatos
+  ) {
+
     const numero =
       normalizarTelefone(
         contato.telefone
@@ -646,7 +765,9 @@ function analisarLista(texto) {
       continue;
     }
 
-    if (!mapa.has(numero)) {
+    if (
+      !mapa.has(numero)
+    ) {
       mapa.set(
         numero,
         contato
@@ -663,14 +784,22 @@ function analisarLista(texto) {
    IMPORTAR CONTATOS
    ============================================================ */
 
-function importarContatos(contatos) {
+function importarContatos(
+  contatos
+) {
   const conversas =
     getConversas();
 
-  let adicionados = 0;
-  let duplicados = 0;
+  let adicionados =
+    0;
 
-  for (const contato of contatos) {
+  let duplicados =
+    0;
+
+  for (
+    const contato of contatos
+  ) {
+
     if (
       !contato.telefone ||
       telefoneJaExiste(
@@ -683,11 +812,14 @@ function importarContatos(contatos) {
     }
 
     conversas.push({
-      id: gerarId(),
+      id:
+        gerarId(),
 
       company:
-        contato.empresa ||
-        "Empresa sem nome",
+        limparEmpresa(
+          contato.empresa ||
+          "Empresa sem nome"
+        ),
 
       phone:
         formatarTelefone(
@@ -695,13 +827,17 @@ function importarContatos(contatos) {
         ),
 
       stage:
-        etapaValida(contato.etapa)
+        etapaValida(
+          contato.etapa
+        )
           ? contato.etapa
           : "Prospectado",
 
-      firstReply: 0,
+      firstReply:
+        0,
 
-      updated: hoje(),
+      updated:
+        hoje(),
 
       note:
         contato.observacao ||
@@ -709,14 +845,16 @@ function importarContatos(contatos) {
 
       history: [
         {
-          from: "system",
+          from:
+            "system",
 
           text:
             contato.observacao
               ? `Contato importado. Informação: ${contato.observacao}`
               : "Contato importado.",
 
-          time: hoje()
+          time:
+            hoje()
         }
       ]
     });
@@ -735,11 +873,13 @@ function importarContatos(contatos) {
 }
 
 /* ============================================================
-   BOTÃO IMPORTAR LISTA
+   BOTÃO IMPORTAR
    ============================================================ */
 
 function criarBotaoImportar() {
-  if ($("igImportarListaBtn")) {
+  if (
+    $("igImportarListaBtn")
+  ) {
     return;
   }
 
@@ -780,10 +920,13 @@ function criarBotaoImportar() {
     referencia &&
     referencia.parentElement
   ) {
+
     referencia.parentElement.appendChild(
       botao
     );
+
   } else {
+
     document.body.appendChild(
       botao
     );
@@ -795,7 +938,9 @@ function criarBotaoImportar() {
    ============================================================ */
 
 function criarModalImportacao() {
-  if ($("igImportModal")) {
+  if (
+    $("igImportModal")
+  ) {
     return;
   }
 
@@ -822,7 +967,9 @@ function criarModalImportacao() {
     >
 
       <div class="modalTop">
+
         <div>
+
           <h2>
             Importar lista de contatos
           </h2>
@@ -832,6 +979,7 @@ function criarModalImportacao() {
             O sistema identifica automaticamente
             empresa, telefone e etapa.
           </p>
+
         </div>
 
         <button
@@ -841,38 +989,46 @@ function criarModalImportacao() {
         >
           Fechar
         </button>
+
       </div>
 
       <div
         class="safe"
         style="margin-bottom:14px;"
       >
+
         <b>
           Formatos aceitos:
         </b>
 
+        <br><br>
+
+        <b>
+          Tudo na mesma linha:
+        </b>
+
         <br>
 
-        <b>Tudo na mesma linha:</b>
+        Oficina Motor Sul (41) 99999-1001 Prospectado
+
         <br>
-        Oficina Motor Sul
-        (41) 99999-1001
-        Prospectado
+
+        Estética Bella Vida (41) 98888-1002 Respondeu
 
         <br><br>
 
-        <b>Ou separado:</b>
+        <b>
+          Ou separado:
+        </b>
+
         <br>
+
         Oficina Motor Sul
         <br>
         (41) 99999-1001
         <br>
         Prospectado
 
-        <br><br>
-
-        Também aceita vários contatos
-        seguidos, sem linhas em branco.
       </div>
 
       <textarea
@@ -887,21 +1043,7 @@ function criarModalImportacao() {
           font:inherit;
           resize:vertical;
         "
-        placeholder="Exemplo:
-
-Oficina Motor Sul (41) 99999-1001 Prospectado
-Estética Bella Vida (41) 98888-1002 Respondeu
-Auto Center Paraná (41) 97777-1003 Interessado
-
-Ou:
-
-Oficina Motor Sul
-(41) 99999-1001
-Prospectado
-
-Estética Bella Vida
-(41) 98888-1002
-Respondeu"
+        placeholder="Cole sua lista aqui..."
       ></textarea>
 
       <div
@@ -909,7 +1051,6 @@ Respondeu"
         style="margin-top:15px;"
       ></div>
 
-      <!-- BOTÕES FIXOS NO FINAL DO MODAL -->
       <div
         class="igImportAcoes"
         style="
@@ -1001,11 +1142,16 @@ function abrirImportacao() {
   $("igConfirmarImport").style.display =
     "none";
 
-  importadosTemporarios = [];
+  importadosTemporarios =
+    [];
 
-  setTimeout(() => {
-    $("igImportTextarea")?.focus();
-  }, 50);
+  setTimeout(
+    () => {
+      $("igImportTextarea")
+        ?.focus();
+    },
+    50
+  );
 }
 
 function fecharImportacao() {
@@ -1019,12 +1165,13 @@ function fecharImportacao() {
 }
 
 /* ============================================================
-   ANALISAR LISTA
+   ANALISAR IMPORTAÇÃO
    ============================================================ */
 
 function analisarImportacaoInterface() {
   const texto =
-    $("igImportTextarea")?.value ||
+    $("igImportTextarea")
+      ?.value ||
     "";
 
   const resultado =
@@ -1034,6 +1181,7 @@ function analisarImportacaoInterface() {
     $("igConfirmarImport");
 
   if (!texto.trim()) {
+
     resultado.innerHTML = `
       <div class="safe">
         Cole uma lista antes de analisar.
@@ -1047,12 +1195,15 @@ function analisarImportacaoInterface() {
   }
 
   const contatos =
-    analisarLista(texto);
+    analisarLista(
+      texto
+    );
 
   importadosTemporarios =
     contatos;
 
   if (!contatos.length) {
+
     resultado.innerHTML = `
       <div class="safe">
         Não consegui identificar nenhum contato.
@@ -1129,6 +1280,7 @@ function analisarImportacaoInterface() {
 
           <thead>
             <tr>
+
               <th
                 style="
                   text-align:left;
@@ -1155,49 +1307,52 @@ function analisarImportacaoInterface() {
               >
                 Etapa
               </th>
+
             </tr>
           </thead>
 
           <tbody>
 
-            ${contatos.map(c => `
-              <tr>
+            ${contatos.map(
+              c => `
+                <tr>
 
-                <td
-                  style="
-                    padding:8px;
-                    border-top:1px solid #e2e8f0;
-                  "
-                >
-                  ${escaparHTML(
-                    c.empresa
-                  )}
-                </td>
+                  <td
+                    style="
+                      padding:8px;
+                      border-top:1px solid #e2e8f0;
+                    "
+                  >
+                    ${escaparHTML(
+                      c.empresa
+                    )}
+                  </td>
 
-                <td
-                  style="
-                    padding:8px;
-                    border-top:1px solid #e2e8f0;
-                  "
-                >
-                  ${escaparHTML(
-                    c.telefone
-                  )}
-                </td>
+                  <td
+                    style="
+                      padding:8px;
+                      border-top:1px solid #e2e8f0;
+                    "
+                  >
+                    ${escaparHTML(
+                      c.telefone
+                    )}
+                  </td>
 
-                <td
-                  style="
-                    padding:8px;
-                    border-top:1px solid #e2e8f0;
-                  "
-                >
-                  ${escaparHTML(
-                    c.etapa
-                  )}
-                </td>
+                  <td
+                    style="
+                      padding:8px;
+                      border-top:1px solid #e2e8f0;
+                    "
+                  >
+                    ${escaparHTML(
+                      c.etapa
+                    )}
+                  </td>
 
-              </tr>
-            `).join("")}
+                </tr>
+              `
+            ).join("")}
 
           </tbody>
 
@@ -1208,28 +1363,10 @@ function analisarImportacaoInterface() {
     </div>
   `;
 
-  /*
-     MOSTRA O BOTÃO DE CONFIRMAÇÃO
-     QUANDO EXISTIREM CONTATOS NOVOS
-  */
-
   confirmar.style.display =
     novos > 0
       ? "inline-block"
       : "none";
-
-  /*
-     GARANTE QUE O BOTÃO FIQUE VISÍVEL
-  */
-
-  if (novos > 0) {
-    setTimeout(() => {
-      confirmar.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest"
-      });
-    }, 50);
-  }
 }
 
 /* ============================================================
@@ -1255,7 +1392,7 @@ function confirmarImportacaoInterface() {
         Importação concluída.
       </b>
 
-      <br>
+      <br><br>
 
       ${resultado.adicionados}
       contato(s) adicionado(s).
@@ -1289,24 +1426,34 @@ function mostrarPagina(view) {
       : "dashboard";
 
   document
-    .querySelectorAll(".view")
-    .forEach(secao => {
-      secao.classList.toggle(
-        "active",
-        secao.id === nome
-      );
-    });
+    .querySelectorAll(
+      ".view"
+    )
+    .forEach(
+      secao => {
+
+        secao.classList.toggle(
+          "active",
+          secao.id === nome
+        );
+
+      }
+    );
 
   document
     .querySelectorAll(
       ".nav[data-view]"
     )
-    .forEach(item => {
-      item.classList.toggle(
-        "active",
-        item.dataset.view === nome
-      );
-    });
+    .forEach(
+      item => {
+
+        item.classList.toggle(
+          "active",
+          item.dataset.view === nome
+        );
+
+      }
+    );
 
   if ($("title")) {
     $("title").textContent =
@@ -1314,10 +1461,12 @@ function mostrarPagina(view) {
   }
 
   try {
+
     if (
       window.location.hash !==
       `#${nome}`
     ) {
+
       history.pushState(
         {
           view: nome
@@ -1326,11 +1475,14 @@ function mostrarPagina(view) {
         `#${nome}`
       );
     }
+
   } catch (erro) {
+
     console.warn(
       "Não foi possível atualizar o histórico.",
       erro
     );
+
   }
 
   render();
@@ -1341,24 +1493,31 @@ function configurarMenu() {
     .querySelectorAll(
       ".nav[data-view]"
     )
-    .forEach(item => {
+    .forEach(
+      item => {
 
-      item.onclick =
-        event => {
+        item.onclick =
+          event => {
 
-          event.preventDefault();
+            event.preventDefault();
 
-          mostrarPagina(
-            item.dataset.view
-          );
-        };
-    });
+            mostrarPagina(
+              item.dataset.view
+            );
+
+          };
+
+      }
+    );
 }
 
 function carregarPaginaDoHash() {
   const hash =
     window.location.hash
-      .replace(/^#/, "");
+      .replace(
+        /^#/,
+        ""
+      );
 
   const view =
     TITULOS[hash]
@@ -1366,24 +1525,34 @@ function carregarPaginaDoHash() {
       : "dashboard";
 
   document
-    .querySelectorAll(".view")
-    .forEach(secao => {
-      secao.classList.toggle(
-        "active",
-        secao.id === view
-      );
-    });
+    .querySelectorAll(
+      ".view"
+    )
+    .forEach(
+      secao => {
+
+        secao.classList.toggle(
+          "active",
+          secao.id === view
+        );
+
+      }
+    );
 
   document
     .querySelectorAll(
       ".nav[data-view]"
     )
-    .forEach(item => {
-      item.classList.toggle(
-        "active",
-        item.dataset.view === view
-      );
-    });
+    .forEach(
+      item => {
+
+        item.classList.toggle(
+          "active",
+          item.dataset.view === view
+        );
+
+      }
+    );
 
   if ($("title")) {
     $("title").textContent =
@@ -1405,7 +1574,10 @@ window.addEventListener(
    DASHBOARD
    ============================================================ */
 
-function renderDashboard(conversas) {
+function renderDashboard(
+  conversas
+) {
+
   const total =
     conversas.length;
 
@@ -1424,7 +1596,9 @@ function renderDashboard(conversas) {
           "Pediu modelo",
           "Orçamento / negociação",
           "Venda fechada"
-        ].includes(c.stage)
+        ].includes(
+          c.stage
+        )
     ).length;
 
   const fechadas =
@@ -1473,72 +1647,75 @@ function renderDashboard(conversas) {
     );
 
   if ($("bars")) {
+
     $("bars").innerHTML =
-      ETAPAS.map(etapa => {
+      ETAPAS.map(
+        etapa => {
 
-        const quantidade =
-          conversas.filter(
-            c =>
-              c.stage ===
-              etapa
-          ).length;
+          const quantidade =
+            conversas.filter(
+              c =>
+                c.stage ===
+                etapa
+            ).length;
 
-        const largura =
-          quantidade
-            ? Math.max(
-                5,
-                quantidade /
-                  max *
-                  100
-              )
-            : 0;
+          const largura =
+            quantidade
+              ? Math.max(
+                  5,
+                  quantidade /
+                    max *
+                    100
+                )
+              : 0;
 
-        return `
-          <div class="barline">
+          return `
+            <div class="barline">
 
-            <div>
-              <span>
-                ${escaparHTML(
-                  etapa
-                )}
-              </span>
+              <div>
 
-              <b>
-                ${quantidade}
-              </b>
+                <span>
+                  ${escaparHTML(
+                    etapa
+                  )}
+                </span>
+
+                <b>
+                  ${quantidade}
+                </b>
+
+              </div>
+
+              <div class="bar">
+
+                <i
+                  style="
+                    width:${largura}%
+                  "
+                ></i>
+
+              </div>
+
             </div>
+          `;
 
-            <div class="bar">
-              <i
-                style="
-                  width:${largura}%
-                "
-              ></i>
-            </div>
-
-          </div>
-        `;
-
-      }).join("");
+        }
+      ).join("");
   }
 
   const recentes =
-    [...conversas]
-      .sort(
-        (a, b) =>
-          String(
-            b.updated
-          ).localeCompare(
-            String(
-              a.updated
-            )
-          )
-      )
-      .slice(0, 5);
+    ordenarPorDataRecente(
+      conversas
+    ).slice(
+      0,
+      5
+    );
 
   if ($("recent")) {
+
     $("recent").innerHTML =
       recentes.length
+
         ? recentes.map(
             c => `
               <div class="recent">
@@ -1550,17 +1727,23 @@ function renderDashboard(conversas) {
                 </b>
 
                 <small>
+
                   ${escaparHTML(
                     c.phone
                   )}
+
                   •
+
                   ${escaparHTML(
                     c.stage
                   )}
+
                   •
+
                   ${escaparHTML(
                     c.updated
                   )}
+
                 </small>
 
               </div>
@@ -1579,38 +1762,62 @@ function renderDashboard(conversas) {
    CONVERSAS
    ============================================================ */
 
-function renderConversas(conversas) {
+function renderConversas(
+  conversas
+) {
+
   const busca =
     (
-      $("search")?.value ||
+      $("search")
+        ?.value ||
       ""
     )
       .toLowerCase()
       .trim();
 
   const filtro =
-    $("stageFilter")?.value ||
+    $("stageFilter")
+      ?.value ||
     "";
 
+  /*
+     IMPORTANTE:
+     AQUI A LISTA É ORDENADA
+     DA MAIS RECENTE PARA A MAIS ANTIGA
+  */
+
+  const ordenadas =
+    ordenarPorDataRecente(
+      conversas
+    );
+
   const filtradas =
-    conversas.filter(c => {
+    ordenadas.filter(
+      c => {
 
-      const texto =
-        `${c.company} ${c.phone} ${c.note}`
-          .toLowerCase();
+        const texto =
+          `${c.company} ${c.phone} ${c.note}`
+            .toLowerCase();
 
-      return (
-        (!busca ||
-          texto.includes(
-            busca
-          )) &&
-        (!filtro ||
-          c.stage ===
-            filtro)
-      );
-    });
+        return (
+          (
+            !busca ||
+            texto.includes(
+              busca
+            )
+          ) &&
+          (
+            !filtro ||
+            c.stage ===
+              filtro
+          )
+        );
+
+      }
+    );
 
   if ($("rows")) {
+
     $("rows").innerHTML =
       filtradas.length
 
@@ -1619,11 +1826,13 @@ function renderConversas(conversas) {
               <tr>
 
                 <td>
+
                   <b>
                     ${escaparHTML(
                       c.company
                     )}
                   </b>
+
                 </td>
 
                 <td>
@@ -1633,20 +1842,25 @@ function renderConversas(conversas) {
                 </td>
 
                 <td>
+
                   <span class="pill">
                     ${escaparHTML(
                       c.stage
                     )}
                   </span>
+
                 </td>
 
                 <td>
+
                   ${escaparHTML(
                     c.updated
                   )}
+
                 </td>
 
                 <td>
+
                   <button
                     type="button"
                     class="secondary view-btn"
@@ -1654,6 +1868,7 @@ function renderConversas(conversas) {
                   >
                     Ver conversa
                   </button>
+
                 </td>
 
               </tr>
@@ -1662,12 +1877,14 @@ function renderConversas(conversas) {
 
         : `
           <tr>
+
             <td
               colspan="5"
               class="empty"
             >
               Nenhum resultado.
             </td>
+
           </tr>
         `;
   }
@@ -1676,108 +1893,133 @@ function renderConversas(conversas) {
     .querySelectorAll(
       ".view-btn"
     )
-    .forEach(botao => {
+    .forEach(
+      botao => {
 
-      botao.onclick =
-        () =>
-          abrirConversa(
-            Number(
-              botao.dataset.id
-            )
-          );
-    });
+        botao.onclick =
+          () =>
+            abrirConversa(
+              Number(
+                botao.dataset.id
+              )
+            );
+
+      }
+    );
 }
 
 /* ============================================================
    FUNIL
    ============================================================ */
 
-function renderFunil(conversas) {
+function renderFunil(
+  conversas
+) {
+
   if (!$("board")) {
     return;
   }
 
   $("board").innerHTML =
-    ETAPAS.map(etapa => {
+    ETAPAS.map(
+      etapa => {
 
-      const contatos =
-        conversas.filter(
-          c =>
-            c.stage ===
-            etapa
-        );
+        const contatos =
+          ordenarPorDataRecente(
+            conversas.filter(
+              c =>
+                c.stage ===
+                etapa
+            )
+          );
 
-      return `
-        <div class="col">
+        return `
+          <div class="col">
 
-          <b>
-            ${escaparHTML(
-              etapa
-            )}
-            (${contatos.length})
-          </b>
+            <b>
 
-          ${
-            contatos.length
+              ${escaparHTML(
+                etapa
+              )}
 
-              ? contatos
-                  .map(
-                    c => `
-                      <div
-                        class="ticket"
-                        data-id="${c.id}"
-                      >
+              (${contatos.length})
 
-                        <b>
-                          ${escaparHTML(
-                            c.company
-                          )}
-                        </b>
+            </b>
 
-                        <small>
-                          ${escaparHTML(
-                            c.phone
-                          )}
-                        </small>
+            ${
+              contatos.length
 
-                      </div>
-                    `
-                  )
-                  .join("")
+                ? contatos
+                    .map(
+                      c => `
+                        <div
+                          class="ticket"
+                          data-id="${c.id}"
+                        >
 
-              : `
-                <p class="empty">
-                  Nenhuma conversa.
-                </p>
-              `
-          }
+                          <b>
+                            ${escaparHTML(
+                              c.company
+                            )}
+                          </b>
 
-        </div>
-      `;
+                          <small>
+                            ${escaparHTML(
+                              c.phone
+                            )}
+                          </small>
 
-    }).join("");
+                          <small>
+                            ${escaparHTML(
+                              c.updated
+                            )}
+                          </small>
+
+                        </div>
+                      `
+                    )
+                    .join("")
+
+                : `
+                  <p class="empty">
+                    Nenhuma conversa.
+                  </p>
+                `
+            }
+
+          </div>
+        `;
+
+      }
+    ).join("");
 
   document
     .querySelectorAll(
       ".ticket[data-id]"
     )
-    .forEach(ticket => {
+    .forEach(
+      ticket => {
 
-      ticket.onclick =
-        () =>
-          abrirConversa(
-            Number(
-              ticket.dataset.id
-            )
-          );
-    });
+        ticket.onclick =
+          () =>
+            abrirConversa(
+              Number(
+                ticket.dataset.id
+              )
+            );
+
+      }
+    );
 }
 
 /* ============================================================
    ANÁLISE
    ============================================================ */
 
-function renderAnalise(conversas) {
+function renderAnalise(
+  conversas
+) {
+
   const total =
     conversas.length;
 
@@ -1821,6 +2063,7 @@ function renderAnalise(conversas) {
     ).length;
 
   if ($("responseRate")) {
+
     $("responseRate").textContent =
       total
         ? `${Math.round(
@@ -1832,6 +2075,7 @@ function renderAnalise(conversas) {
   }
 
   if ($("interestRate")) {
+
     $("interestRate").textContent =
       respondidas
         ? `${Math.round(
@@ -1843,6 +2087,7 @@ function renderAnalise(conversas) {
   }
 
   if ($("modelRate")) {
+
     $("modelRate").textContent =
       total
         ? `${Math.round(
@@ -1854,6 +2099,7 @@ function renderAnalise(conversas) {
   }
 
   if ($("saleRate")) {
+
     $("saleRate").textContent =
       total
         ? `${Math.round(
@@ -1870,13 +2116,15 @@ function renderAnalise(conversas) {
         e =>
           conversas.filter(
             c =>
-              c.stage === e
+              c.stage ===
+              e
           ).length
       ),
       1
     );
 
   if ($("dropoff")) {
+
     $("dropoff").innerHTML =
       ETAPAS.map(
         etapa => {
@@ -1902,6 +2150,7 @@ function renderAnalise(conversas) {
             <div class="barline">
 
               <div>
+
                 <span>
                   ${escaparHTML(
                     etapa
@@ -1911,18 +2160,22 @@ function renderAnalise(conversas) {
                 <b>
                   ${quantidade}
                 </b>
+
               </div>
 
               <div class="bar">
+
                 <i
                   style="
                     width:${largura}%
                   "
                 ></i>
+
               </div>
 
             </div>
           `;
+
         }
       ).join("");
   }
@@ -1944,7 +2197,10 @@ function renderAnalise(conversas) {
     respostas.length
       ? Math.round(
           respostas.reduce(
-            (a, b) =>
+            (
+              a,
+              b
+            ) =>
               a + b,
             0
           ) /
@@ -1967,44 +2223,64 @@ function renderAnalise(conversas) {
       : 0;
 
   if ($("timing")) {
+
     $("timing").innerHTML = `
       <p>
+
         <b>
           Média até primeira resposta:
         </b>
-        ${media} minutos
+
+        ${media}
+        minutos
+
       </p>
 
       <p>
+
         <b>
           Mais rápida:
         </b>
-        ${maisRapida} minutos
+
+        ${maisRapida}
+        minutos
+
       </p>
 
       <p>
+
         <b>
           Mais demorada:
         </b>
-        ${maisDemorada} minutos
+
+        ${maisDemorada}
+        minutos
+
       </p>
     `;
   }
 
   if ($("insight")) {
+
     $("insight").innerHTML = `
       <h2>
         Leitura dos dados
       </h2>
 
       <p>
+
         Hoje há
-        <b>${respondidas}</b>
+        <b>
+          ${respondidas}
+        </b>
         conversa(s) que responderam
         e
-        <b>${interessadas}</b>
+        <b>
+          ${interessadas}
+        </b>
         que chegaram a interesse,
         pedido de modelo ou negociação.
+
       </p>
     `;
   }
@@ -2014,7 +2290,10 @@ function renderAnalise(conversas) {
    ANOTAÇÕES
    ============================================================ */
 
-function renderNotas(conversas) {
+function renderNotas(
+  conversas
+) {
+
   if (!$("notesList")) {
     return;
   }
@@ -2030,28 +2309,36 @@ function renderNotas(conversas) {
         >
 
           <h3>
+
             ${escaparHTML(
               c.company
             )}
 
             <span class="pill">
+
               ${escaparHTML(
                 c.stage
               )}
+
             </span>
+
           </h3>
 
           <p>
+
             ${escaparHTML(
               c.note ||
               "Sem anotação."
             )}
+
           </p>
 
           <small>
+
             ${escaparHTML(
               c.phone
             )}
+
           </small>
 
         </div>
@@ -2070,15 +2357,19 @@ function renderNotas(conversas) {
           </h3>
 
           <p>
+
             ${escaparHTML(
               n.texto
             )}
+
           </p>
 
           <small>
+
             ${escaparHTML(
               n.data
             )}
+
           </small>
 
         </div>
@@ -2103,6 +2394,7 @@ function renderNotas(conversas) {
    ============================================================ */
 
 function render() {
+
   const conversas =
     getConversas();
 
@@ -2131,7 +2423,10 @@ function render() {
    ABRIR CONVERSA
    ============================================================ */
 
-function abrirConversa(id) {
+function abrirConversa(
+  id
+) {
+
   const conversa =
     getConversas().find(
       c =>
@@ -2147,18 +2442,24 @@ function abrirConversa(id) {
     conversa.id;
 
   if ($("detailName")) {
+
     $("detailName").textContent =
       conversa.company;
   }
 
   if ($("detailMeta")) {
+
     $("detailMeta").textContent =
       `${conversa.phone} • ${conversa.stage} • última atividade ${conversa.updated}`;
   }
 
   if ($("detailSummary")) {
+
     $("detailSummary").innerHTML = `
-      <b>Etapa:</b>
+      <b>
+        Etapa:
+      </b>
+
       ${escaparHTML(
         conversa.stage
       )}
@@ -2189,6 +2490,7 @@ function abrirConversa(id) {
   }
 
   if ($("detailNote")) {
+
     $("detailNote").value =
       conversa.note ||
       "";
@@ -2202,6 +2504,7 @@ function abrirConversa(id) {
       : [];
 
   if ($("history")) {
+
     $("history").innerHTML =
       historico.length
 
@@ -2225,6 +2528,7 @@ function abrirConversa(id) {
                   )}
 
                   <small>
+
                     ${
                       m.from ===
                       "client"
@@ -2233,10 +2537,12 @@ function abrirConversa(id) {
                     }
 
                     •
+
                     ${escaparHTML(
                       m.time ||
                       ""
                     )}
+
                   </small>
 
                 </div>
@@ -2246,14 +2552,17 @@ function abrirConversa(id) {
 
         : `
           <div class="empty">
+
             Nenhum histórico
             importado/registrado
             nesta conversa.
+
           </div>
         `;
   }
 
   if ($("conversationModal")) {
+
     $("conversationModal")
       .classList.add(
         "show"
@@ -2266,7 +2575,9 @@ function abrirConversa(id) {
    ============================================================ */
 
 function abrirNovaConversa() {
+
   if ($("modal")) {
+
     $("modal")
       .classList.add(
         "show"
@@ -2277,6 +2588,7 @@ function abrirNovaConversa() {
 function salvarNovaConversa(
   event
 ) {
+
   event.preventDefault();
 
   const formulario =
@@ -2303,6 +2615,7 @@ function salvarNovaConversa(
       conversas
     )
   ) {
+
     alert(
       "Este telefone já está cadastrado no CRM."
     );
@@ -2311,14 +2624,19 @@ function salvarNovaConversa(
   }
 
   conversas.push({
-    id: gerarId(),
+
+    id:
+      gerarId(),
 
     company:
-      String(
-        dados.get(
-          "company"
-        ) || ""
-      ).trim(),
+      limparEmpresa(
+        String(
+          dados.get(
+            "company"
+          ) ||
+          ""
+        ).trim()
+      ),
 
     phone:
       telefone,
@@ -2335,7 +2653,8 @@ function salvarNovaConversa(
       Number(
         dados.get(
           "firstReply"
-        ) || 0
+        ) ||
+        0
       ),
 
     updated:
@@ -2345,7 +2664,8 @@ function salvarNovaConversa(
       String(
         dados.get(
           "note"
-        ) || ""
+        ) ||
+        ""
       ).trim(),
 
     history: []
@@ -2358,6 +2678,7 @@ function salvarNovaConversa(
   formulario.reset();
 
   if ($("modal")) {
+
     $("modal")
       .classList.remove(
         "show"
@@ -2372,6 +2693,7 @@ function salvarNovaConversa(
    ============================================================ */
 
 function salvarAnotacaoConversa() {
+
   const conversas =
     getConversas();
 
@@ -2402,13 +2724,16 @@ function salvarAnotacaoConversa() {
     carregarAnotacoes();
 
   anotacoes.unshift({
-    data: hoje(),
+
+    data:
+      hoje(),
 
     texto:
       `${conversa.company}: ${
         conversa.note ||
         "Anotação removida."
       }`
+
   });
 
   salvarAnotacoes(
@@ -2427,7 +2752,9 @@ function salvarAnotacaoConversa() {
    ============================================================ */
 
 function preencherSelects() {
+
   if ($("stageFilter")) {
+
     $("stageFilter").innerHTML =
       `
         <option value="">
@@ -2452,6 +2779,7 @@ function preencherSelects() {
   }
 
   if ($("newStage")) {
+
     $("newStage").innerHTML =
       ETAPAS.map(
         e =>
@@ -2475,6 +2803,7 @@ function preencherSelects() {
    ============================================================ */
 
 function inicializar() {
+
   carregarConversas();
 
   preencherSelects();
@@ -2536,30 +2865,36 @@ function inicializar() {
   $("modal")?.addEventListener(
     "click",
     event => {
+
       if (
         event.target ===
         $("modal")
       ) {
+
         $("modal")
           .classList.remove(
             "show"
           );
       }
+
     }
   );
 
   $("conversationModal")?.addEventListener(
     "click",
     event => {
+
       if (
         event.target ===
         $("conversationModal")
       ) {
+
         $("conversationModal")
           .classList.remove(
             "show"
           );
       }
+
     }
   );
 
@@ -2595,10 +2930,14 @@ if (
   document.readyState ===
   "loading"
 ) {
+
   document.addEventListener(
     "DOMContentLoaded",
     inicializar
   );
+
 } else {
+
   inicializar();
+
 }
